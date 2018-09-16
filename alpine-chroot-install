@@ -189,6 +189,26 @@ gen_chroot_script() {
 	# emulation (I have no clue why), that's why /etc/profile is sourced here.
 }
 
+gen_destroy_script() {
+	cat <<-'EOF'
+		#!/bin/sh
+		set -e
+
+		SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+		[ "$(id -u)" -eq 0 ] || _sudo='sudo'
+
+		# Unmounts all filesystem under the specified directory tree.
+		cat /proc/mounts | cut -d' ' -f2 | grep "^$SCRIPT_DIR" | sort -r | while read path; do
+			echo "Unmounting $path" >&2
+			$_sudo umount -fn "$path" || exit 1
+		done
+
+		printf "Do you want to remove directory \"$SCRIPT_DIR\" (yes/no)? "
+		read answer
+		[ "$answer" != 'yes' ] || $_sudo rm -Rf "$SCRIPT_DIR"
+	EOF
+}
+
 #------------------------- Debian/Ubuntu ---------------------------#
 
 alias cmp_versions='dpkg --compare-versions'
@@ -352,7 +372,8 @@ cp /etc/resolv.conf etc/resolv.conf
 	add alpine-base
 
 gen_chroot_script > enter-chroot
-chmod +x enter-chroot
+gen_destroy_script > destroy
+chmod +x enter-chroot destroy
 
 
 einfo 'Binding filesystems into chroot'
@@ -396,5 +417,6 @@ EOF
 cat >&2 <<-EOF
 	---
 	Alpine installation is complete
-	Run $CHROOT_DIR/enter-chroot [-u <user>] [command] to enter the chroot.
+	Run $CHROOT_DIR/enter-chroot [-u <user>] [command] to enter the chroot
+	and $CHROOT_DIR/destroy to destroy it.
 EOF
