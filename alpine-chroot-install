@@ -62,6 +62,8 @@
 #
 #   -v                     Print version and exit.
 #
+#   APK                    APK command to use. Default is "apk". If command is not available APK_TOOLS_URI is used to download and install temporary one.
+#
 #   APK_TOOLS_URI          URL of static apk-tools tarball to download.
 #                          Default is x86_64 apk-tools from
 #                          https://github.com/alpinelinux/apk-tools/releases.
@@ -101,6 +103,7 @@ QEMU_UBUNTU_REL='artful'
 # Version of alpine-chroot-install script.
 VERSION='0.10.0'
 
+APK=${APK:-apk}
 
 #=======================  F u n c t i o n s  =======================#
 
@@ -323,13 +326,14 @@ if [ -n "$ARCH" ] && [ $(normalize_arch $ARCH) != $(normalize_arch $(uname -m)) 
 	cp -v "$QEMU_EMULATOR" usr/bin/
 fi
 
+if [ ! -f $APK ]; then
+	einfo 'Downloading static apk-tools'
 
-einfo 'Downloading static apk-tools'
-
-wgets "$APK_TOOLS_URI" "$APK_TOOLS_SHA256" "$TEMP_DIR"
-tar -C "$TEMP_DIR" -xzf "$TEMP_DIR/${APK_TOOLS_URI##*/}"
-mv "$TEMP_DIR"/apk-tools-*/apk "$TEMP_DIR"/
-
+	wgets "$APK_TOOLS_URI" "$APK_TOOLS_SHA256" "$TEMP_DIR"
+	tar -C "$TEMP_DIR" -xzf "$TEMP_DIR/${APK_TOOLS_URI##*/}"
+	mv "$TEMP_DIR"/apk-tools-*/apk "$TEMP_DIR"/
+	APK="$TEMP_DIR"/apk
+fi
 
 einfo "Installing Alpine Linux $ALPINE_BRANCH ($ARCH) into chroot"
 
@@ -346,7 +350,7 @@ dump_alpine_keys etc/apk/keys/
 
 cp /etc/resolv.conf etc/resolv.conf
 
-"$TEMP_DIR"/apk \
+$APK \
 	--root . --update-cache --initdb --no-progress \
 	${ARCH:+--arch $ARCH} \
 	add alpine-base
